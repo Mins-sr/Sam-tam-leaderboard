@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAM / EfficientTAM 技術カオスマップ</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <div class="brand-badge">VOS / SAM Ecosystem</div>
+        <div>
+          <h1 class="app-title">SAM / EfficientTAM 技術カオスマップ</h1>
+          <p class="app-subtitle" id="meta-summary">データ読み込み中...</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="view-switcher" role="tablist" aria-label="表示モード切替">
+          <button class="view-btn active" data-view="bubble" role="tab" aria-selected="true">2D バブルチャート</button>
+          <button class="view-btn" data-view="table" role="tab" aria-selected="false">比較テーブル</button>
+          <button class="view-btn" data-view="tree" role="tab" aria-selected="false">派生系統図</button>
+        </div>
+
+        <button class="icon-btn" id="btn-open-defs" title="分類定義ドキュメントを表示">分類定義 (.md)</button>
+        <button class="icon-btn" id="btn-reload-data" title="models.json を再読み込み">データ更新</button>
+        <button class="icon-btn" id="btn-theme-toggle" title="ダーク/ライトテーマ切替">テーマ切替</button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Filter Sidebar -->
+      <aside class="sidebar" id="filter-sidebar" aria-label="フィルタ">
+        <div class="sidebar-header">
+          <span class="sidebar-title">フィルタ</span>
+          <span class="count-pill" id="model-count-pill">0 / 0</span>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="search-input">モデル名・技術語検索</label>
+          <input type="search" id="search-input" class="search-input" placeholder="例: EfficientTAM, RepViT, INT8" />
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group-head">
+            <span class="filter-label">ベースモデル系統</span>
+            <button class="mini-link" data-reset-group="family">全選択</button>
+          </div>
+          <div id="filter-families" class="checkbox-list"></div>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group-head">
+            <span class="filter-label">X軸：タスク種別</span>
+            <button class="mini-link" data-reset-group="task">全選択</button>
+          </div>
+          <div id="filter-tasks" class="checkbox-list"></div>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group-head">
+            <span class="filter-label">Y軸：軽量化手法</span>
+            <button class="mini-link" data-reset-group="method">全選択</button>
+          </div>
+          <label class="toggle-inline">
+            <input type="checkbox" id="chk-include-secondary" />
+            <span>副手法の一致も含める</span>
+          </label>
+          <div id="filter-methods" class="checkbox-list"></div>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group-head">
+            <span class="filter-label">パラメータ数上限</span>
+            <span class="range-val" id="param-max-label">900M</span>
+          </div>
+          <input type="range" id="param-max-range" min="5" max="900" step="5" value="900" class="range-input" />
+          <label class="toggle-inline">
+            <input type="checkbox" id="chk-include-null-params" checked />
+            <span>可変・未公表 (null) を含む</span>
+          </label>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group-head">
+            <span class="filter-label">公開年範囲</span>
+            <span class="range-val" id="year-range-label">2022 - 2026</span>
+          </div>
+          <div class="dual-range">
+            <label class="sub-range-label">開始年: <input type="range" id="year-min-range" min="2022" max="2026" step="1" value="2022" /></label>
+            <label class="sub-range-label">終了年: <input type="range" id="year-max-range" min="2022" max="2026" step="1" value="2026" /></label>
+          </div>
+        </div>
+
+        <button class="reset-all-btn" id="btn-reset-all">全フィルタをリセット</button>
+
+        <!-- Manual file fallback for offline file:// opening -->
+        <div class="data-source-box">
+          <div class="data-source-title">データ分離・定期更新</div>
+          <p class="data-source-note">表示データは <code>data/models.json</code> から分離読込しています。</p>
+          <label class="file-upload-btn">
+            別JSONファイル読込
+            <input type="file" id="json-file-input" accept=".json,application/json" hidden />
+          </label>
+        </div>
+      </aside>
+
+      <!-- Workspace Canvas -->
+      <main class="content-area">
+        <!-- Error / Status Banner -->
+        <div class="status-banner hidden" id="status-banner"></div>
+
+        <!-- Bubble View -->
+        <section class="view-panel active" id="view-bubble">
+          <div class="chart-toolbar">
+            <div class="legend-bar" id="family-legend"></div>
+            <div class="chart-controls">
+              <label class="toggle-chip">
+                <input type="checkbox" id="chk-expand-multitask" />
+                <span>複数タスク列に展開表示</span>
+              </label>
+              <span class="size-legend">バブル面積 ∝ パラメータ数(対数) / 破線枠 = 可変(null)</span>
+            </div>
+          </div>
+
+          <div class="chart-container" id="bubble-chart-container">
+            <svg id="bubble-svg" class="bubble-svg" role="img" aria-label="SAM系モデル2Dバブルチャート"></svg>
+          </div>
+        </section>
+
+        <!-- Table View -->
+        <section class="view-panel" id="view-table">
+          <div class="table-wrap">
+            <table class="models-table" id="models-table">
+              <thead>
+                <tr>
+                  <th data-sort="name">モデル名 <span class="sort-ind"></span></th>
+                  <th data-sort="base_family">系統 <span class="sort-ind"></span></th>
+                  <th data-sort="task_types">対応タスク <span class="sort-ind"></span></th>
+                  <th data-sort="optimization_method">主軽量化手法 <span class="sort-ind"></span></th>
+                  <th data-sort="params_million">パラメータ数 <span class="sort-ind"></span></th>
+                  <th data-sort="fps_device">推論速度 / FPS <span class="sort-ind"></span></th>
+                  <th data-sort="venue">発表学会 <span class="sort-ind"></span></th>
+                  <th data-sort="release_date">公開年月 <span class="sort-ind"></span></th>
+                </tr>
+              </thead>
+              <tbody id="models-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tree View -->
+        <section class="view-panel" id="view-tree">
+          <div class="tree-toolbar">
+            <span class="tree-hint">各ベースモデルからの派生関係を表示しています。ノードをクリックすると詳細パネルを開きます。</span>
+          </div>
+          <div class="tree-container" id="tree-container"></div>
+        </section>
+      </main>
+
+      <!-- Detail Drawer -->
+      <aside class="detail-panel" id="detail-panel" aria-label="モデル詳細">
+        <div class="detail-empty" id="detail-empty">
+          <div class="detail-empty-title">モデル詳細パネル</div>
+          <p>チャート上のバブル、テーブルの行、または系統図のノードをクリックすると、モジュール構成・パラメータ内訳・測定FPS・論文/GitHubリンクを表示します。</p>
+        </div>
+        <div class="detail-content hidden" id="detail-content"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="chart-tooltip hidden" id="chart-tooltip" role="tooltip"></div>
+
+  <!-- Definition Modal -->
+  <div class="modal-backdrop hidden" id="defs-modal" role="dialog" aria-modal="true" aria-labelledby="defs-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="defs-modal-title">分類定義ドキュメント (classification-definitions.md)</h2>
+        <button class="icon-btn" id="btn-close-defs">閉じる</button>
+      </div>
+      <div class="modal-body" id="defs-modal-body">読み込み中...</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

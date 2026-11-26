@@ -1,0 +1,1019 @@
+{
+  "metadata": {
+    "version": "1.1.0",
+    "last_updated": "2026-11-26",
+    "schema_version": "1.1",
+    "definition_doc": "docs/classification-definitions.md"
+  },
+  "taxonomies": {
+    "task_types": [
+      {
+        "id": "image_promptable",
+        "label": "静止画プロンプトセグメンテーション",
+        "short_label": "静止画プロンプト",
+        "definition": "単一静止画に対し、点（クリック）・バウンディングボックス・初期マスク・テキスト／視覚例示等の空間・概念プロンプトを入力して対象インスタンスのマスクを出力する単一画像推論モード。"
+      },
+      {
+        "id": "image_automatic",
+        "label": "静止画全自動抽出 (SegEvery)",
+        "short_label": "静止画全自動抽出",
+        "definition": "静止画入力に対し個別のユーザープロンプトを与えずに画面内の全インスタンス候補を自動抽出するモード（グリッド点群サンプリング＋NMS／安定性フィルタ、YOLOv8-segの全インスタンス一括出力、AutoPPNによる自動プロンプト提案、階層的SegEvery等を主要機能・評価対象とするもの）。"
+      },
+      {
+        "id": "video_semi_supervised",
+        "label": "動画Semi-Supervised VOS",
+        "short_label": "動画初期マスク伝播",
+        "definition": "動画の初期フレームで与えられた正解マスク（または初期フレームの点・テキスト指示から生成されたマスク）を起点として、後続フレーム全体へ対象マスクを自動伝播するタスク。"
+      },
+      {
+        "id": "video_promptable",
+        "label": "動画対話型プロンプトセグメンテーション",
+        "short_label": "動画対話プロンプト",
+        "definition": "動画シーケンス内の任意フレームにおいて点・ボックス・マスク等の追加または修正プロンプトを与え、メモリ機構や対話的追跡ループを通じて前後フレームへ連続伝播・マスク修正を行えるタスク。"
+      },
+      {
+        "id": "video_open_vocabulary",
+        "label": "動画オープン語彙・テキスト指定追跡",
+        "short_label": "動画オープン語彙",
+        "definition": "任意の自然言語名詞句・テキストプロンプト（またはテキスト＋視覚例示）を指定し、事前定義クラスに限定されず対象を検出・セグメンテーションして動画フレーム間で継続追跡するタスク。"
+      }
+    ],
+    "optimization_methods": [
+      {
+        "id": "original_architecture",
+        "label": "基盤・独自アーキテクチャ",
+        "short_label": "基盤・独自構造",
+        "definition": "既存モデルのパラメータ削減派生ではなく、新たなタスク定式化・表現学習・メモリ構造を提示する公式基盤モデルバージョン（SAM, SAM 2, SAM 2.1, SAM 3, SAM 3.1）または独立設計の非SAM系VOS単体モデル（XMem, Cutie）。"
+      },
+      {
+        "id": "backbone_redesign",
+        "label": "画像エンコーダ構造再設計",
+        "short_label": "エンコーダ再設計",
+        "definition": "SAM/SAM 2の重厚なViT-Hや階層型Hieraエンコーダを、非階層型ViT-Ti/S、ReLU線形アテンション型EfficientViT、純CNN型RepViT、YOLOv8-seg、LiteViT＋AutoPPN等の演算量の小さいバックボーン構造へ置換・再設計することを主貢献とする手法。"
+      },
+      {
+        "id": "memory_compression",
+        "label": "動画メモリ構造圧縮",
+        "short_label": "メモリ圧縮",
+        "definition": "動画セグメンテーションの時系列メモリ機構において、密な過去フレームメモリトークンを学習可能クエリ集合（2D Spatial Perceiver）や空間ウィンドウプーリング、Object Multiplexによる複数物体共有メモリバケット等へ集約しメモリ計算量を削減する手法。"
+      },
+      {
+        "id": "knowledge_distillation",
+        "label": "知識蒸留アルゴリズム設計",
+        "short_label": "知識蒸留",
+        "definition": "既存の確立された小容量生徒ネットワーク（TinyViTや純CNN構造等）に対し、教師モデル（SAM ViT-HやSAM 2）の特徴・プロンプト応答・時空間相関を転移する蒸留手法（Decoupled Distillation, Prompt-in-the-Loop, Hard-Mining Full-Stage Distillation, HyperKD）の設計を主貢献とする手法。"
+      },
+      {
+        "id": "sparse_acceleration",
+        "label": "推論時スパース計算・動的間引き",
+        "short_label": "スパース間引き",
+        "definition": "学習済みモデルの重みやバックボーン構成を全面置換せず、前フレームのデコーダ顕著性手がかりを用いた背景ウィンドウの動的ショートカット分岐（SWR）や顕著メモリトークンの選択取得（SMR）により推論時計算量を削減する手法。"
+      },
+      {
+        "id": "runtime_optimization",
+        "label": "推論量子化・ランタイム最適化",
+        "short_label": "量子化・推論最適化",
+        "definition": "学習済みモデルの層・ブロック構成を改変せず、タスク特化INT8事後学習量子化（PTQ）やTensorRT FP16/INT8エンジンコンパイル・演算融合の実装および評価自体を主成果物とする手法。"
+      },
+      {
+        "id": "task_decoupling",
+        "label": "タスク分離パイプライン結合",
+        "short_label": "タスク分離結合",
+        "definition": "静止画セグメンタ（SAM等）の内部構造を改変・再学習せず、外部のマスク伝播器（DeAOT, XMem）、点追跡器（CoTracker, PIPS）、オープン語彙検出器（Grounding DINO）、双方向伝播融合モジュール（DEVA）をパイプライン結合して動画追跡を実現する手法。"
+      }
+    ],
+    "base_families": [
+      {
+        "id": "sam",
+        "label": "SAM (第1世代)",
+        "color": "#3b82f6"
+      },
+      {
+        "id": "sam2",
+        "label": "SAM 2 (第2世代)",
+        "color": "#10b981"
+      },
+      {
+        "id": "sam3",
+        "label": "SAM 3 (第3世代)",
+        "color": "#a855f7"
+      },
+      {
+        "id": "non_sam",
+        "label": "非SAM系VOS",
+        "color": "#94a3b8"
+      }
+    ]
+  },
+  "models": [
+    {
+      "id": "sam-vit-h",
+      "name": "SAM (ViT-H)",
+      "task_types": [
+        "image_promptable",
+        "image_automatic"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": 636,
+      "params_note": "ViT-Huge画像エンコーダ約632M＋プロンプトエンコーダ・マスクデコーダ約4Mの合計",
+      "fps_device": "約2392 ms/画像 @ NVIDIA T4 (arXiv:2312.13789 Table 1)",
+      "venue": "ICCV 2023",
+      "base_model": "独自基盤モデル（Meta SAM ViT-H）",
+      "base_family": "sam",
+      "github_url": "https://github.com/facebookresearch/segment-anything",
+      "paper_url": "https://arxiv.org/abs/2304.02643",
+      "release_date": "2023-04",
+      "description": "ViT-Huge画像エンコーダ（約632M、14×14ウィンドウアテンション＋4層のグローバルアテンション）と約4Mのプロンプトエンコーダ・双方向トランスフォーマー型マスクデコーダで構成。点・ボックス・マスクプロンプトによる静止画セグメンテーションに加え、密なグリッド点群サンプリングとIoU・安定性スコアフィルタ・NMSを用いたSegment EverythingモードでSA-1Bデータセットを構築した基盤モデル。"
+    },
+    {
+      "id": "sam2-hiera-b-plus",
+      "name": "SAM 2 (Hiera-B+)",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": 80.8,
+      "params_note": "Hiera-B+階層型画像エンコーダ＋Memory Attention＋Memory Encoder＋マスクデコーダの合計",
+      "fps_device": "43.8 FPS @ NVIDIA A100 (batch size 1)",
+      "venue": "ICLR 2025 (Oral)",
+      "base_model": "独自基盤モデル（Meta SAM 2 Hiera-B+）",
+      "base_family": "sam2",
+      "github_url": "https://github.com/facebookresearch/sam2",
+      "paper_url": "https://arxiv.org/abs/2408.00714",
+      "release_date": "2024-07",
+      "description": "階層型画像エンコーダHiera-B+と、過去フレームの空間特徴・物体ポインタを格納するMemory Bank・Memory Attention・Memory Encoder・マスクデコーダを統合したストリーミング動画・静止画基盤モデル。SA-Vデータセットで学習され、動画内の任意フレームにおける点・ボックス・マスクの追加・修正プロンプトを前後フレームへ連続伝播し、1フレーム入力時は静止画プロンプト推論を実行する。"
+    },
+    {
+      "id": "sam2-1-hiera-b-plus",
+      "name": "SAM 2.1 (Hiera-B+)",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": 80.8,
+      "params_note": "SAM 2 (Hiera-B+) と同一の80.8Mネットワーク構成（オクルージョン・メモリ更新学習を再調整）",
+      "fps_device": "43.8 FPS相当 @ NVIDIA A100 (SAM 2 Hiera-B+同等構成)",
+      "venue": "GitHub OSS (Meta)",
+      "base_model": "SAM 2 (Hiera-B+)",
+      "base_family": "sam2",
+      "github_url": "https://github.com/facebookresearch/sam2",
+      "paper_url": "https://arxiv.org/abs/2408.00714",
+      "release_date": "2024-09",
+      "description": "SAM 2（Hiera-B+）と同一のアーキテクチャ・80.8Mパラメータ構成を維持しつつ、オクルージョン発生後の再出現予測と時系列メモリバンク更新の学習スケジュールを再調整した公式チェックポイント改訂版。静止画プロンプト推論、初期フレームマスク伝播（Semi-Supervised VOS）、および任意フレーム対話プロンプト（PVS）を同一インタフェースで実行する。"
+    },
+    {
+      "id": "sam3",
+      "name": "SAM 3",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable",
+        "video_open_vocabulary"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": 848,
+      "params_note": "Perception Encoder＋DETR型検出器（Presence Head含む）＋動画トラッカーの統合構成",
+      "fps_device": "約30 ms/画像 @ NVIDIA HシリーズGPU (100超インスタンス同時処理時)",
+      "venue": "arXiv 2025",
+      "base_model": "独自基盤モデル（Meta SAM 3）",
+      "base_family": "sam3",
+      "github_url": "https://github.com/facebookresearch/sam3",
+      "paper_url": "https://arxiv.org/abs/2511.16719",
+      "release_date": "2025-11",
+      "description": "共有Perception Encoder、識別と位置特定を分離するPresence Head付きDETR型検出器、および時系列メモリ動画トラッカーを統合した848Mの基盤モデル。従来の点・ボックス・マスクによるPromptable Visual Segmentation（PVS）に加え、短い名詞句テキストや画像例示で該当インスタンス全数を検出・セグメンテーション・追跡するPromptable Concept Segmentation（PCS）を導入し、SA-Coベンチマークで評価された。"
+    },
+    {
+      "id": "sam3-1",
+      "name": "SAM 3.1",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable",
+        "video_open_vocabulary"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [
+        "memory_compression"
+      ],
+      "params_million": 848,
+      "params_note": "SAM 3 (848M) にObject Multiplex（MultiplexMaskDecoder・DecoupledMemoryAttention）を追加",
+      "fps_device": "128インスタンス同時追跡時 @ NVIDIA H100 で SAM 3 比 約7倍高速",
+      "venue": "GitHub OSS (Meta)",
+      "base_model": "SAM 3",
+      "base_family": "sam3",
+      "github_url": "https://github.com/facebookresearch/sam3",
+      "paper_url": "https://arxiv.org/abs/2511.16719",
+      "release_date": "2026-03",
+      "description": "SAM 3（848M）の公式アップデート版であり、複数物体追跡時の計算量増大を抑えるObject Multiplex機構（MultiplexMaskDecoderおよびDecoupledMemoryAttention）を追加。物体ごとに個別推論パスを回すSAM 3のメモリ方式を最大16物体単位の共有メモリバケットによる同時処理へ圧縮統合し、128インスタンス同時追跡時のNVIDIA H100推論でSAM 3比約7倍のスループットを達成した。"
+    },
+    {
+      "id": "mobilesam",
+      "name": "MobileSAM",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "knowledge_distillation",
+      "optimization_methods_secondary": [
+        "backbone_redesign"
+      ],
+      "params_million": 9.66,
+      "params_note": "TinyViT画像エンコーダ約5M＋SAMマスクデコーダ・プロンプトエンコーダの合計",
+      "fps_device": "約232 ms/画像 @ NVIDIA T4 (arXiv:2312.13789 Table 1)",
+      "venue": "arXiv 2023",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/ChaoningZhang/MobileSAM",
+      "paper_url": "https://arxiv.org/abs/2306.14289",
+      "release_date": "2023-06",
+      "description": "SAMのプロンプトエンコーダとマスクデコーダを固定再利用したまま、ViT-H画像エンコーダ（約632M）を約5MのTinyViTへ置換するため、マスクデコーダとの結合最適化を切り離して画像エンコーダの特徴出力のみを直接模倣するDecoupled Distillationを提案。総パラメータ数を636Mから9.66Mへ削減し、NVIDIA T4上の推論時間を約2392 msから約232 msへ短縮した。"
+    },
+    {
+      "id": "edgesam",
+      "name": "EdgeSAM",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "knowledge_distillation",
+      "optimization_methods_secondary": [
+        "backbone_redesign"
+      ],
+      "params_million": 9.6,
+      "params_note": "純CNNエンコーダ＋マスクデコーダの合計",
+      "fps_device": ">30 FPS @ iPhone 14",
+      "venue": "CVPR 2024",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/chongzhou96/EdgeSAM",
+      "paper_url": "https://arxiv.org/abs/2312.06660",
+      "release_date": "2023-12",
+      "description": "画像エンコーダ単体のタスク非依存蒸留では点・ボックスプロンプト応答の整合が失われる点に対処し、プロンプトエンコーダとマスクデコーダを蒸留ループ内部に組み込んで点・ボックス入力付きで教師出力を模倣するPrompt-in-the-Loop Distillationを提案。純CNN系エンコーダ（合計9.6M）への蒸留によりiPhone 14で30 FPS超の推論を実現し、COCO・LVISでゼロショットmIoUを評価した。"
+    },
+    {
+      "id": "efficientsam-vit-s",
+      "name": "EfficientSAM (ViT-S)",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [
+        "knowledge_distillation"
+      ],
+      "params_million": 25,
+      "params_note": "SAMI事前学習済みViT-Smallエンコーダ＋小容量デコーダ（Ti版は約9.8M）",
+      "fps_device": "未公表（公式論文はSAM ViT-H比 約20倍のパラメータ削減・推論速度比を報告）",
+      "venue": "CVPR 2024",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/yformer/EfficientSAM",
+      "paper_url": "https://arxiv.org/abs/2312.00863",
+      "release_date": "2023-12",
+      "description": "マスク付き画像事前学習手法SAMI（SAM-leveraged Masked Image Pretraining）により、ImageNetのマスクされた入力画像からSAM ViT-Hエンコーダの特徴表現を再構成するように汎用ViT-Small（およびViT-Tiny）バックボーンを事前学習し、SA-1B上でデコーダと統合ファインチューニングしたモデル（25M）。点・ボックスプロンプト評価（COCO・LVIS）でSAM ViT-H比約20倍のパラメータ削減と推論時間短縮を達成した。"
+    },
+    {
+      "id": "efficientvit-sam-l0",
+      "name": "EfficientViT-SAM (L0)",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [
+        "knowledge_distillation",
+        "runtime_optimization"
+      ],
+      "params_million": 34.8,
+      "params_note": "EfficientViT-L0エンコーダ＋SAMデコーダ（512×512入力構成、L1/L2/XL0/XL1版あり）",
+      "fps_device": "762 画像/秒 @ NVIDIA A100 / 8.2 ms @ Jetson AGX Orin (TensorRT)",
+      "venue": "arXiv 2024",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/mit-han-lab/efficientvit",
+      "paper_url": "https://arxiv.org/abs/2402.05008",
+      "release_date": "2024-02",
+      "description": "SAM ViT-H画像エンコーダを、二次計算量のSoftmaxアテンションに代えてReLU線形アテンションとマルチスケール畳み込みを用いるEfficientViT-L0（全体34.8M、35G MACs）へ置換したモデル。ViT-Hエンコーダからの知識蒸留に続きSA-1Bでのエンドツーエンド学習を行い、TensorRT FP16エンジン実行によりNVIDIA A100で762画像/秒、Jetson AGX Orinで8.2 msを達成した。"
+    },
+    {
+      "id": "repvit-sam",
+      "name": "RepViT-SAM",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [
+        "knowledge_distillation"
+      ],
+      "params_million": 5.1,
+      "params_note": "RepViT-M0.9ベース構成（エンコーダ4.75M; M1.1エンコーダ構成は8.2M）",
+      "fps_device": "MobileSAM比 約10倍高速（バックボーン単体約1.0 ms @ iPhone 12）",
+      "venue": "CVPR 2024",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/THU-MIG/RepViT",
+      "paper_url": "https://arxiv.org/abs/2312.05760",
+      "release_date": "2023-12",
+      "description": "MobileNetV3をViTの設計視点（トークンミキサーとチャネルミキサーの分離・構造再パラメータ化）で再設計した純CNNバックボーンRepViT-M0.9（エンコーダ4.75M、全体5.1M）によりSAMのViT-Hエンコーダを置換し、MobileSAM方式のエンコーダ知識蒸留を適用したモデル。自己注意演算を排除した純CNN構造により、iPhone 12上でバックボーン単体約1.0 ms、MobileSAM比約10倍の推論速度を達成した。"
+    },
+    {
+      "id": "nanosam",
+      "name": "NanoSAM",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "runtime_optimization",
+      "optimization_methods_secondary": [
+        "backbone_redesign",
+        "knowledge_distillation"
+      ],
+      "params_million": 15.5,
+      "params_note": "ResNet-18画像エンコーダ約11.7M＋MobileSAM由来マスクデコーダ約3.8Mの合計",
+      "fps_device": ">27 画像/秒（NVIDIA Jetson Orin 向け TensorRT FP16/INT8 実行最適化）",
+      "venue": "GitHub OSS (NVIDIA AI IOT)",
+      "base_model": "MobileSAM / SAM",
+      "base_family": "sam",
+      "github_url": "https://github.com/NVIDIA-AI-IOT/nanosam",
+      "paper_url": null,
+      "release_date": "2023-08",
+      "description": "MobileSAM画像エンコーダを教師としてラベルなし画像上で特徴蒸留したResNet-18画像エンコーダ（約11.7M）とMobileSAM由来マスクデコーダ（約3.8M）をそれぞれ独立のTensorRT FP16/INT8エンジンへコンパイルするNVIDIA Jetson Orin向け実行最適化プロジェクト。点・ボックスコーナー（ラベル0/1/2/3）のプロンプト推論でJetson Orin上27画像/秒超を達成する。"
+    },
+    {
+      "id": "tinysam",
+      "name": "TinySAM",
+      "task_types": [
+        "image_promptable",
+        "image_automatic"
+      ],
+      "optimization_method": "knowledge_distillation",
+      "optimization_methods_secondary": [
+        "backbone_redesign"
+      ],
+      "params_million": 10.5,
+      "params_note": "TinyViT約5M〜11M帯のエンコーダ＋マスクデコーダ構成（全体10.5M）",
+      "fps_device": "約232 ms/画像 @ NVIDIA T4 (arXiv:2312.13789 Table 1)",
+      "venue": "AAAI 2025",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/xinghaochen/TinySAM",
+      "paper_url": "https://arxiv.org/abs/2312.13789",
+      "release_date": "2023-12",
+      "description": "TinyViT生徒エンコーダとSAMデコーダで構成される全段（10.5M）に対し、オンライン困難プロンプトサンプリングと困難マスク重み付けを導入したHard-Mining Full-Stage Knowledge Distillationを適用したモデル。さらにSegment Everything推論時の冗長グリッド点評価を削減する2段階のHierarchical Segment Everything戦略を導入し、SegEvery推論時間を約2倍短縮した。"
+    },
+    {
+      "id": "q-tinysam",
+      "name": "Q-TinySAM",
+      "task_types": [
+        "image_promptable"
+      ],
+      "optimization_method": "runtime_optimization",
+      "optimization_methods_secondary": [
+        "knowledge_distillation",
+        "backbone_redesign"
+      ],
+      "params_million": 10.5,
+      "params_note": "TinySAM (10.5M, 20.3G MACs) の層構造を維持したまま重み・活性化をINT8量子化",
+      "fps_device": "約61 ms/画像 @ NVIDIA T4 (TinySAM 232 ms比 約3.8倍高速、COCO zero-shot AP 41.4%)",
+      "venue": "AAAI 2025",
+      "base_model": "TinySAM",
+      "base_family": "sam",
+      "github_url": "https://github.com/xinghaochen/TinySAM",
+      "paper_url": "https://arxiv.org/abs/2312.13789",
+      "release_date": "2023-12",
+      "description": "TinySAM（10.5M、20.3G MACs）のネットワーク層・ブロック構成を改変せず、Hessian指標に基づく量子化感度評価を用いてプロンプト可能セグメンテーション向けに設計したタスク特化INT8事後学習量子化（PTQ）を重みと活性化に適用した量子化モデル。再学習不要でNVIDIA T4の推論遅延を約232 msから約61 ms（約3.8倍）へ短縮し、COCO zero-shot AP 41.4%を達成した。"
+    },
+    {
+      "id": "fastsam",
+      "name": "FastSAM (FastSAM-x)",
+      "task_types": [
+        "image_promptable",
+        "image_automatic"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [],
+      "params_million": 68,
+      "params_note": "YOLOv8-x segベース構成68M（小容量版のFastSAM-sは11.8M）",
+      "fps_device": "SAM ViT-H比 最大約50倍高速（arXiv:2306.12156報告）",
+      "venue": "arXiv 2023",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": "https://github.com/CASIA-LMC-Lab/FastSAM",
+      "paper_url": "https://arxiv.org/abs/2306.12156",
+      "release_date": "2023-06",
+      "description": "SAMのViT構造と自己注意演算をCNN型インスタンスセグメンテーション検出器YOLOv8-x seg（68M）へ全面置換し、SA-1Bの2%データのみで直接学習したモデル。単一フォワードパスで全インスタンスのマスクを一括生成するStage 1（Everything Mode）と、点・ボックスプロンプトに基づき該当マスクを抽出するStage 2の2段階推論により、SAM ViT-H比最大約50倍の推論速度を達成した。"
+    },
+    {
+      "id": "lite-sam",
+      "name": "Lite-SAM",
+      "task_types": [
+        "image_promptable",
+        "image_automatic"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [],
+      "params_million": 4.2,
+      "params_note": "LiteViTエンコーダ1.16M＋AutoPPN＋プロンプトエンコーダ・マスクデコーダの合計4.2M",
+      "fps_device": "未公表（ECCV 2024論文にて4.2MでのSegEveryエンドツーエンド高速化を報告）",
+      "venue": "ECCV 2024",
+      "base_model": "SAM (ViT-H)",
+      "base_family": "sam",
+      "github_url": null,
+      "paper_url": "https://arxiv.org/abs/2407.08965",
+      "release_date": "2024-07",
+      "description": "知識蒸留を用いずSA-1Bの18%データから直接学習された総パラメータ4.2Mの静止画セグメンテーションモデル。1.16MのCNN-TransformerハイブリッドエンコーダLiteViTと、SegEvery時の密なグリッド探索を不要にする自動プロンプト提案ネットワークAutoPPN（ボックス・点を直接回帰）を導入し、SegEveryのエンドツーエンド推論遅延削減とCOCO・LVISでのSegAny評価の両方を報告している。"
+    },
+    {
+      "id": "efficienttam-vit-ti",
+      "name": "EfficientTAM (ViT-Ti)",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [
+        "memory_compression"
+      ],
+      "params_million": 18,
+      "params_note": "ViT-Tiny非階層型エンコーダ＋ウィンドウプーリング型メモリモジュール＋デコーダの合計",
+      "fps_device": "109.4 FPS @ NVIDIA A100 (Ti/2) / 約10〜28 FPS @ iPhone 15 Pro Max",
+      "venue": "ICCV 2025",
+      "base_model": "SAM 2 (Hiera-B+)",
+      "base_family": "sam2",
+      "github_url": "https://github.com/yformer/EfficientTAM",
+      "paper_url": "https://arxiv.org/abs/2411.18933",
+      "release_date": "2024-11",
+      "description": "SAM 2の階層型Hiera画像エンコーダを非階層型プレーンViT-Tinyへ置換し、過去フレーム特徴の空間トークン数を削減する2×2ウィンドウプーリング付きメモリモジュールを組み合わせた18Mモデル。SA-1BおよびSA-Vで統合学習され、静止画・動画プロンプトセグメンテーションにおいてNVIDIA A100で109.4 FPS（Ti/2）、iPhone 15 Pro Maxで約10〜28 FPSを達成した。"
+    },
+    {
+      "id": "efficienttam-vit-s",
+      "name": "EfficientTAM (ViT-S)",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "backbone_redesign",
+      "optimization_methods_secondary": [
+        "memory_compression"
+      ],
+      "params_million": 34,
+      "params_note": "ViT-Small非階層型エンコーダ＋ウィンドウプーリング型メモリモジュール＋デコーダの合計",
+      "fps_device": "SAM 2 (Hiera-B+)比 約1.6〜2倍高速 @ NVIDIA A100 (SA-V J&F 約74.5)",
+      "venue": "ICCV 2025",
+      "base_model": "SAM 2 (Hiera-B+)",
+      "base_family": "sam2",
+      "github_url": "https://github.com/yformer/EfficientTAM",
+      "paper_url": "https://arxiv.org/abs/2411.18933",
+      "release_date": "2024-11",
+      "description": "SAM 2の階層型Hieraエンコーダを非階層型プレーンViT-Smallへ置換し、空間ウィンドウプーリング付きメモリモジュールと組み合わせてSA-1B・SA-Vで統合学習した34Mモデル。NVIDIA A100上でSAM 2（Hiera-B+）比約1.6〜2倍の推論速度を達成しつつ、SA-VベンチマークでJ&F約74.5を記録した。"
+    },
+    {
+      "id": "edgetam",
+      "name": "EdgeTAM",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "memory_compression",
+      "optimization_methods_secondary": [
+        "backbone_redesign",
+        "knowledge_distillation"
+      ],
+      "params_million": 16,
+      "params_note": "RepViT画像エンコーダ8.3M＋メモリエンコーダ1.2M＋マスクデコーダ・2D Spatial Perceiver等6.22M",
+      "fps_device": "約16 FPS @ iPhone 15 Pro Max (CoreML実行時、SAM 2比 約22倍高速、DAVIS 2017 J&F 87.7)",
+      "venue": "CVPR 2025",
+      "base_model": "SAM 2 (Hiera-B+)",
+      "base_family": "sam2",
+      "github_url": "https://github.com/facebookresearch/EdgeTAM",
+      "paper_url": "https://arxiv.org/abs/2501.07256",
+      "release_date": "2025-01",
+      "description": "SAM 2の動画メモリアテンションがモバイル推論の主要ボトルネックである点を特定し、密なフレームメモリをグローバルレベルとパッチレベルの固定個学習可能クエリへ圧縮する2D Spatial Perceiverを導入した16Mモデル。RepViT（8.3M）へのエンコーダ置換と推論負荷ゼロの蒸留パイプラインを併用し、iPhone 15 Pro Max（CoreML）で約16 FPS、DAVIS 2017 J&F 87.7を達成した。"
+    },
+    {
+      "id": "mobilesam2",
+      "name": "MobileSAM2 (23M)",
+      "task_types": [
+        "image_promptable",
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "knowledge_distillation",
+      "optimization_methods_secondary": [
+        "backbone_redesign"
+      ],
+      "params_million": 23.7,
+      "params_note": "23M代表構成は23.7M（他に5.8Mおよび10.4Mの生徒構成あり）",
+      "fps_device": "未公表（ECCV 2026論文ではLVOS/MOSE/SA-V長尺VOSベンチマーク精度を報告）",
+      "venue": "ECCV 2026",
+      "base_model": "SAM 2 (Hiera-B+)",
+      "base_family": "sam2",
+      "github_url": "https://github.com/ChaoningZhang/MobileSAM",
+      "paper_url": "https://arxiv.org/abs/2607.12297",
+      "release_date": "2026-07",
+      "description": "SAM 2の静止画・動画能力を小容量生徒構造（5.8M / 10.4M / 23.7M）へ圧縮するため、ハイパーグラフ構造によりフレーム間の高次時間ダイナミクスを転移するTemporal HyperKDと多粒度空間手がかりを転移するGranularity HyperKD（総称HyperKD）およびアーキテクチャ探索を提案したモデル。LVOS・MOSE・SA-V等の長尺VOSおよび静止画タスクで評価された。"
+    },
+    {
+      "id": "efficient-sam2",
+      "name": "Efficient-SAM2",
+      "task_types": [
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "sparse_acceleration",
+      "optimization_methods_secondary": [],
+      "params_million": 224.4,
+      "params_note": "SAM 2.1-L (224.4M) の学習済み重みをそのまま使用（追加パラメータ極小）",
+      "fps_device": "SAM 2.1-L比 1.68倍高速 (SA-V test精度低下 約1.0%)",
+      "venue": "ICLR 2026",
+      "base_model": "SAM 2.1-L",
+      "base_family": "sam2",
+      "github_url": "https://github.com/jingjing0419/Efficient-SAM2",
+      "paper_url": "https://arxiv.org/abs/2602.08224",
+      "release_date": "2026-02",
+      "description": "SAM 2.1-L（224.4M）のバックボーンや重みを置換せず、推論時のオブジェクト指向スパース性を用いて冗長演算を動的に間引く学習後最適化手法。前フレームのデコーダ顕著性手がかりに基づき背景画像ウィンドウを低演算量のショートカット分岐へルーティングするSWR（Sparse Window Routing）と、FIFO顕著性マスクキューにより顕著メモリトークンのみを選択取得するSMR（Sparse Memory Retrieval）により、SA-V test精度低下約1.0%で1.68倍の推論速度を達成した。"
+    },
+    {
+      "id": "sam-track",
+      "name": "SAM-Track",
+      "task_types": [
+        "video_semi_supervised",
+        "video_open_vocabulary"
+      ],
+      "optimization_method": "task_decoupling",
+      "optimization_methods_secondary": [],
+      "params_million": null,
+      "params_note": "SAM＋DeAOT＋Grounding DINOの選択モデルの組合せにより総パラメータ数が可変",
+      "fps_device": "未公表（SAM初期化コスト＋DeAOT伝播速度に依存）",
+      "venue": "arXiv 2023",
+      "base_model": "SAM + DeAOT + Grounding DINO",
+      "base_family": "sam",
+      "github_url": "https://github.com/z-x-yang/Segment-and-Track-Anything",
+      "paper_url": "https://arxiv.org/abs/2305.06558",
+      "release_date": "2023-05",
+      "description": "静止画セグメンタSAM、階層型動画オブジェクト追跡モデルDeAOT、およびオープンセット物体検出器Grounding DINOを内部構造の改変・再学習なしで結合した動画追跡パイプライン。初期フレームまたはキーフレームにおいてGrounding DINOの自然言語テキスト検出やSAMのクリック・ストローク入力から対象マスクを生成し、後続フレームのマスク追従をDeAOTで伝播する。"
+    },
+    {
+      "id": "track-anything-tam",
+      "name": "Track-Anything (TAM)",
+      "task_types": [
+        "video_semi_supervised",
+        "video_promptable"
+      ],
+      "optimization_method": "task_decoupling",
+      "optimization_methods_secondary": [],
+      "params_million": null,
+      "params_note": "SAM＋XMem＋E2FGVIの選択モデルの組合せにより総パラメータ数が可変",
+      "fps_device": "未公表（XMem約22〜30+ FPS＋SAM初期化コストに依存）",
+      "venue": "arXiv 2023",
+      "base_model": "SAM + XMem + E2FGVI",
+      "base_family": "sam",
+      "github_url": "https://github.com/gaomingqi/Track-Anything",
+      "paper_url": "https://arxiv.org/abs/2304.11968",
+      "release_date": "2023-04",
+      "description": "静止画セグメンタSAM、動画オブジェクト追跡モデルXMem、およびフロー誘導動画インペインティングモデルE2FGVIを構造改変なしで統合した対話型動画セグメンテーション・編集システム。初期フレームでのクリックからSAMが生成したマスクをXMemで伝播するほか、追跡失敗が生じた任意の中間フレームでSAMクリックによりマスクを修正してXMemメモリを更新し、前後フレームへ再伝播できる。"
+    },
+    {
+      "id": "sam-pt",
+      "name": "SAM-PT",
+      "task_types": [
+        "video_semi_supervised"
+      ],
+      "optimization_method": "task_decoupling",
+      "optimization_methods_secondary": [],
+      "params_million": null,
+      "params_note": "SAM＋CoTracker/PIPS点追跡器の組合せにより総パラメータ数が可変",
+      "fps_device": "未公表（外部点追跡器と毎フレームSAMデコード処理に依存）",
+      "venue": "arXiv 2023",
+      "base_model": "SAM + CoTracker / PIPS",
+      "base_family": "sam",
+      "github_url": "https://github.com/SysCV/sam-pt",
+      "paper_url": "https://arxiv.org/abs/2307.01197",
+      "release_date": "2023-07",
+      "description": "静止画セグメンタSAMと外部の長期疎点追跡器（PIPSまたはCoTracker）をパイプライン結合し、動画学習なしでゼロショットSemi-Supervised VOSを実現するシステム。初期フレームマスクからK-Medoidsクラスタリング等で正例・負例の点群をサンプリングし、点追跡器が出力する全フレームの点軌道とオクルージョン判定を毎フレームのSAMマスクデコーダへ投入（多段デコード・点再初期化を含む）してマスクを生成する。"
+    },
+    {
+      "id": "deva",
+      "name": "DEVA",
+      "task_types": [
+        "video_semi_supervised",
+        "video_open_vocabulary"
+      ],
+      "optimization_method": "task_decoupling",
+      "optimization_methods_secondary": [],
+      "params_million": null,
+      "params_note": "画像側セグメンタ（SAM / Grounding DINO等）＋双方向伝播モジュールの組合せにより可変",
+      "fps_device": "未公表（画像側セグメンタ＋伝播モジュールの合算コストに依存）",
+      "venue": "ICCV 2023",
+      "base_model": "SAM / Grounding DINO + 双方向時間伝播モジュール",
+      "base_family": "sam",
+      "github_url": "https://github.com/hkchengrex/Tracking-Anything-with-DEVA",
+      "paper_url": "https://arxiv.org/abs/2309.03903",
+      "release_date": "2023-09",
+      "description": "動画セグメンテーションを「タスク特化の静止画セグメンタ（SAMやGrounding DINO+SAM）」と「クラス・タスク非依存の双方向時間伝播モジュール」に分離し、半オンライン仮説融合（semi-online fusion）で時系列整合を取る分離型アーキテクチャ。タスクごとの動画アノテーション学習を必要とせず、DAVIS等のSemi-Supervised VOSおよびテキスト指定のオープン語彙動画追跡を実行する。"
+    },
+    {
+      "id": "xmem",
+      "name": "XMem",
+      "task_types": [
+        "video_semi_supervised"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": null,
+      "params_note": "ResNet-50特徴抽出器＋3層メモリ構造（バックボーン設定により約20〜30M超で変動し単一値未確定）",
+      "fps_device": "約22〜30+ FPS @ NVIDIA RTX 3090 (DAVIS 480p)",
+      "venue": "ECCV 2022",
+      "base_model": "独自非SAM系VOSモデル（Atkinson-Shiffrin記憶モデル）",
+      "base_family": "non_sam",
+      "github_url": "https://github.com/hkchengrex/XMem",
+      "paper_url": "https://arxiv.org/abs/2207.07115",
+      "release_date": "2022-07",
+      "description": "SAM系モジュールを含まない独立設計のSemi-Supervised VOSモデル。人間のAtkinson-Shiffrin記憶モデルに基づき、高頻度に更新されるSensory Memory、数秒間を扱うWorking Memory、および長尺動画向けに高利用度特徴を統合圧縮（memory potentiation）して保持するLong-Term Memoryの3層メモリをResNet-50ベースの特徴抽出器と統合し、NVIDIA RTX 3090上のDAVIS 480pで約22〜30+ FPSを実現した。"
+    },
+    {
+      "id": "cutie",
+      "name": "Cutie",
+      "task_types": [
+        "video_semi_supervised"
+      ],
+      "optimization_method": "original_architecture",
+      "optimization_methods_secondary": [],
+      "params_million": 39.4,
+      "params_note": "Object Transformer (qt) を含む標準Semi-Supervised VOS構成",
+      "fps_device": "約25〜30+ FPS @ 480p VOS評価環境",
+      "venue": "CVPR 2024 (Highlight)",
+      "base_model": "独自非SAM系VOSモデル（Object-Level Memory Reading）",
+      "base_family": "non_sam",
+      "github_url": "https://github.com/hkchengrex/Cutie",
+      "paper_url": "https://arxiv.org/abs/2310.12982",
+      "release_date": "2023-10",
+      "description": "XMem等の画素単位ボトムアップ記憶照合が背景ノイズや類似物体による誤対応を招く課題に対し、物体単位の要約表現を保持する学習可能オブジェクトクエリと高解像度画素特徴をマスク付きアテンションで反復相互作用させるQuery-based Object Transformer（qt）を導入した39.4Mの非SAM系Semi-Supervised VOSモデル。MOSE・DAVIS等で前景と背景を分離し、480p評価環境で約25〜30+ FPSを実現した。"
+    }
+  ],
+  "derivatives": [
+    {
+      "id": "efficienttam-ti-pt",
+      "name": "efficienttam_ti.pt",
+      "parent_ids": [
+        "efficienttam-vit-ti"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "標準構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_ti.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_ti.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-ti-1-pt",
+      "name": "efficienttam_ti_1.pt",
+      "parent_ids": [
+        "efficienttam-vit-ti"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "過去フレームのメモリ処理に EfficientRoPEAttention1 を使う構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_ti_1.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_ti_1.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-ti-2-pt",
+      "name": "efficienttam_ti_2.pt",
+      "parent_ids": [
+        "efficienttam-vit-ti"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "過去フレームのメモリ処理に EfficientRoPEAttention2 を使う構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_ti_2.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_ti_2.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-ti-512x512-pt",
+      "name": "efficienttam_ti_512x512.pt",
+      "parent_ids": [
+        "efficienttam-vit-ti"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "入力解像度512×512用の構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_ti_512x512.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_ti_512x512.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-s-pt",
+      "name": "efficienttam_s.pt",
+      "parent_ids": [
+        "efficienttam-vit-s"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "標準構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_s.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_s.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-s-1-pt",
+      "name": "efficienttam_s_1.pt",
+      "parent_ids": [
+        "efficienttam-vit-s"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "過去フレームのメモリ処理に EfficientRoPEAttention1 を使う構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_s_1.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_s_1.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-s-2-pt",
+      "name": "efficienttam_s_2.pt",
+      "parent_ids": [
+        "efficienttam-vit-s"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "過去フレームのメモリ処理に EfficientRoPEAttention2 を使う構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_s_2.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_s_2.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-s-512x512-pt",
+      "name": "efficienttam_s_512x512.pt",
+      "parent_ids": [
+        "efficienttam-vit-s"
+      ],
+      "kind": "公式チェックポイント",
+      "weights": "配布済みの重みを対応する設定で読み込む。",
+      "description": "入力解像度512×512用の構成。",
+      "sources": [
+        {
+          "label": "配布ファイル",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_s_512x512.pt"
+        },
+        {
+          "label": "公式設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_s_512x512.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "efficienttam-mobile",
+      "name": "EfficientTAM-Mobile",
+      "parent_ids": [
+        "efficienttam-vit-ti"
+      ],
+      "kind": "公式モバイル構成",
+      "weights": "Ti/2を512×512で学習。論文で使用した重みと配布ファイルとの対応は未確認。",
+      "description": "著者はiPhone 15 Pro Maxで約28 FPS、SA-V testでJ&F 68.6と報告。端末推論の演算精度は表1に記載なし。公開Ti・512設定のクロスアテンションはRoPEAttention。",
+      "sources": [
+        {
+          "label": "ICCV 2025 論文・表1",
+          "url": "https://openaccess.thecvf.com/content/ICCV2025/papers/Xiong_Efficient_Track_Anything_ICCV_2025_paper.pdf"
+        },
+        {
+          "label": "公開Ti・512設定",
+          "url": "https://github.com/yformer/EfficientTAM/blob/main/efficient_track_anything/configs/efficienttam/efficienttam_ti_512x512.yaml"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "realtime-efficienttam",
+      "name": "RealtimeEfficientTAM",
+      "parent_ids": [
+        "efficienttam-vit-ti",
+        "efficienttam-vit-s"
+      ],
+      "kind": "ストリーミング実装",
+      "weights": "公式チェックポイントと対応する設定を指定する。",
+      "description": "カメラの最初のフレームに点を指定し、後続のフレームを順に処理する。",
+      "sources": [
+        {
+          "label": "実装と利用例",
+          "url": "https://github.com/AllenNeuralDynamics/RealtimeEfficientTAM"
+        }
+      ],
+      "checked_on": "2026-11-26",
+      "group": "EfficientTAM共通"
+    },
+    {
+      "id": "imedstam",
+      "name": "iMedSTAM",
+      "parent_ids": [
+        "efficienttam-s-512x512-pt"
+      ],
+      "kind": "医療向け追加学習",
+      "weights": "専用の追加学習済み重みを配布。元のS・512チェックポイントもREADMEから選択できる。",
+      "description": "3D医療画像や動画を対象に、ユーザーの指示でマスクを補正する。",
+      "sources": [
+        {
+          "label": "実装・重みの案内",
+          "url": "https://github.com/tofriede/iMedSTAM"
+        },
+        {
+          "label": "論文",
+          "url": "https://doi.org/10.1007/978-3-032-23496-4_10"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "embedl-orin-s-fp16",
+      "name": "Embedl · S · FP16 · Orin Nano Super",
+      "parent_ids": [
+        "efficienttam-s-512x512-pt"
+      ],
+      "kind": "TensorRT変換",
+      "weights": "公式512版をTensorRTに変換。FP16で実行。",
+      "description": "Jetson Orin Nano Super、512×512、追跡対象1個。Embedlの計測でGPU時間の中央値は34.26 ms／フレーム。",
+      "sources": [
+        {
+          "label": "実行環境と測定条件",
+          "url": "https://embedl.com/embedl/efficienttam-s-512/orin-nano-super"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "embedl-orin-ti-fp16",
+      "name": "Embedl · Ti · FP16 · Orin Nano Super",
+      "parent_ids": [
+        "efficienttam-ti-512x512-pt"
+      ],
+      "kind": "TensorRT変換",
+      "weights": "公式512版をTensorRTに変換。FP16で実行。",
+      "description": "Jetson Orin Nano Super、512×512、追跡対象1個。開発者の報告でモデル処理は36.8 FPS。",
+      "sources": [
+        {
+          "label": "開発者の実測報告",
+          "url": "https://www.reddit.com/r/JetsonNano/comments/1xlyd3h/track_anything_in_real_time_on_a_jetson_nano/"
+        },
+        {
+          "label": "元チェックポイント",
+          "url": "https://huggingface.co/yunyangx/efficient-track-anything/blob/9bdd8ab585b19ef95f9c9ed847ac9478301890b4/efficienttam_ti_512x512.pt"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "embedl-orin-s-int8",
+      "name": "Embedl · S · INT8 · Orin Nano Super",
+      "parent_ids": [
+        "efficienttam-s-512x512-pt"
+      ],
+      "kind": "TensorRT変換",
+      "weights": "公式512版をTensorRTに変換。画像エンコーダの重みを量子化。",
+      "description": "Jetson Orin Nano Super、512×512、追跡対象1個。Embedlの旧掲載仕様では画像エンコーダを事後量子化し、他の主要部分はFP16で実行。INT8版の現行配布先は未確認。",
+      "sources": [
+        {
+          "label": "Embedlのビルド仕様（旧URL）",
+          "url": "https://embedl.com/yunyangx/efficient-track-anything/orin-nano-super/efficienttam-s-512_int8_embedl_tensorrt"
+        },
+        {
+          "label": "同じ端末向けの現行FP16版",
+          "url": "https://embedl.com/embedl/efficienttam-s-512/orin-nano-super"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "cuvis-efficienttam-mirror",
+      "name": "Cubert公式重みミラー",
+      "parent_ids": [
+        "efficienttam-s-pt",
+        "efficienttam-ti-pt",
+        "efficienttam-s-512x512-pt",
+        "efficienttam-ti-512x512-pt"
+      ],
+      "kind": "配布ミラー",
+      "weights": "上流の4ファイルとバイト単位で同一。配布元が各SHA-256を掲載。",
+      "description": "Cuvis.AIが参照する上流リビジョンと各ファイルの照合値を固定して配布する。",
+      "sources": [
+        {
+          "label": "配布履歴・SHA-256",
+          "url": "https://huggingface.co/cubert-gmbh/efficient-track-anything"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    },
+    {
+      "id": "cuvis-ai-rtsam2",
+      "name": "Cuvis.AI RTSAM2",
+      "parent_ids": [
+        "cuvis-efficienttam-mirror"
+      ],
+      "kind": "ストリーミング実装",
+      "weights": "ミラーに保存した公式重みを利用する。",
+      "description": "枠または初期マスクから、1ステップにつき1フレームずつ追跡するcuvis.aiプラグイン。実装元はrobrosinc/REALTIME_SAM2。",
+      "sources": [
+        {
+          "label": "プラグイン",
+          "url": "https://github.com/cubert-hyperspectral/cuvis-ai-rtsam2"
+        },
+        {
+          "label": "元実装",
+          "url": "https://github.com/robrosinc/REALTIME_SAM2"
+        }
+      ],
+      "checked_on": "2026-11-26"
+    }
+  ],
+  "communities": [
+    {
+      "model_ids": [
+        "efficienttam-vit-ti",
+        "efficienttam-vit-s"
+      ],
+      "checked_on": "2026-11-25",
+      "description": "公式GitHubで845スター、47フォーク、未解決のIssueが24件。",
+      "sources": [
+        {
+          "label": "公式GitHub",
+          "url": "https://github.com/yformer/EfficientTAM"
+        },
+        {
+          "label": "リアルタイム追跡",
+          "url": "https://github.com/yformer/EfficientTAM/issues/19"
+        },
+        {
+          "label": "CoreML・ONNX変換",
+          "url": "https://github.com/yformer/EfficientTAM/issues/3"
+        },
+        {
+          "label": "チェックポイントの違い",
+          "url": "https://github.com/yformer/EfficientTAM/issues/12"
+        }
+      ]
+    }
+  ]
+}
